@@ -352,6 +352,11 @@ export interface DataZoomConfig {
   readonly maxSpan?: number;
 }
 
+export interface ViewRange {
+  readonly x: Readonly<{ min: number; max: number }>;
+  readonly y: Readonly<{ min: number; max: number }>;
+}
+
 export interface LineStyleConfig {
   readonly width?: number;
   readonly opacity?: number;

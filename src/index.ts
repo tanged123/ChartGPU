@@ -116,6 +116,7 @@ export type {
   SeriesType,
   TooltipConfig,
   TooltipParams,
+  ViewRange,
 } from './config/types';
 
 // Options defaults + resolution

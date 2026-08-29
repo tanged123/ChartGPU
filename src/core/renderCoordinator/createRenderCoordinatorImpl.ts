@@ -12,6 +12,7 @@ import type {
   HeatmapData,
   HeatmapUpdate,
   OHLCDataPoint,
+  ViewRange,
 } from '../../config/types';
 import {
   sliceBandByX,
@@ -250,6 +251,7 @@ const isHTMLCanvasElement = isHTMLCanvasElementGPU;
 
 export interface RenderCoordinator {
   setOptions(resolvedOptions: ResolvedChartGPUOptions): void;
+  setViewRange(range: ViewRange): void;
   /**
    * Appends new points to a cartesian series' runtime data without requiring a full
    * `setOptions(...)` resolver pass.
@@ -5128,6 +5130,25 @@ export function createRenderCoordinator(
     // onChange will requestRender + emit.
   };
 
+  const setViewRange: RenderCoordinator['setViewRange'] = (range) => {
+    assertNotDisposed();
+    currentOptions = {
+      ...currentOptions,
+      xAxis: { ...currentOptions.xAxis, min: range.x.min, max: range.x.max },
+      yAxes: currentOptions.yAxes.map((axis, index) =>
+        index === 0 ? { ...axis, min: range.y.min, max: range.y.max } : axis
+      ),
+    };
+    lastInteractionScales = null;
+    cachedVisibleYBoundsByAxis.clear();
+    cachedVisibleYBoundsXWindow = null;
+    stickyAutoXDomain = null;
+    stickyAutoYDomainByAxis.clear();
+    animatedDisplayYDomainByAxis.clear();
+    axisLabelContentEpoch++;
+    requestRender();
+  };
+
   const onZoomRangeChange: RenderCoordinator['onZoomRangeChange'] = (cb) => {
     assertNotDisposed();
     zoomRangeListeners.add(cb);
@@ -5138,6 +5159,7 @@ export function createRenderCoordinator(
 
   return {
     setOptions,
+    setViewRange,
     appendData,
     updateHeatmap,
     getRuntimeSeriesData,

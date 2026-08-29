@@ -984,6 +984,43 @@ describe('ChartGPU - External Render Mode', () => {
   });
 
   describe('Edge cases and error handling', () => {
+    it('setViewRange does not traverse or resolve resident series', async () => {
+      const series = [
+        { type: 'line' as const, sampling: 'none' as const, data: [{ x: 1, y: 10 }] },
+        { type: 'line' as const, sampling: 'none' as const, data: [{ x: 2, y: 20 }] },
+      ];
+      let seriesReads = 0;
+      const guardedSeries = new Proxy(series, {
+        get(target, property, receiver) {
+          if (property !== 'length') seriesReads += 1;
+          return Reflect.get(target, property, receiver);
+        },
+      });
+      const chart = await ChartGPU.create(
+        mockContainer,
+        {
+          renderMode: 'external',
+          xAxis: { type: 'value', min: 0, max: 10 },
+          yAxis: { type: 'value', min: -1, max: 1 },
+          series: guardedSeries,
+        },
+        { adapter: mockAdapter, device: mockDevice },
+      );
+      while (chart.needsRender()) chart.renderFrame();
+      seriesReads = 0;
+
+      chart.setViewRange({
+        x: { min: 2, max: 4 },
+        y: { min: -3, max: 5 },
+      });
+
+      expect(seriesReads).toBe(0);
+      expect(chart.options.xAxis).toMatchObject({ min: 2, max: 4 });
+      expect(chart.options.yAxis).toMatchObject({ min: -3, max: 5 });
+      expect(chart.needsRender()).toBe(true);
+      await chart.dispose();
+    });
+
     it('renderFrame handles disposed chart gracefully', async () => {
       const options: ChartGPUOptions = {
         renderMode: 'external',

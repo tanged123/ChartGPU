@@ -13,6 +13,7 @@ import type {
   PieCenter,
   PieRadius,
   RenderMode,
+  ViewRange,
 } from './config/types';
 import { createDataZoomSlider } from './components/createDataZoomSlider';
 import type { DataZoomSlider } from './components/createDataZoomSlider';
@@ -194,6 +195,8 @@ export interface ChartGPUInstance {
   readonly options: Readonly<ChartGPUOptions>;
   readonly disposed: boolean;
   setOption(options: ChartGPUOptions): void;
+  /** Updates 2D viewport domains without resolving or traversing series data. */
+  setViewRange(range: ViewRange): void;
   /**
    * 3D only (`coordinateSystem: 'cartesian3d'`): re-fit camera to data AABB.
    * No-op on 2D charts.
@@ -2622,6 +2625,32 @@ export async function createChartGPU(
 
       // Requirement: setOption triggers a render (and thus series parsing/extent/scales update inside render).
       requestRender();
+    },
+    setViewRange(range) {
+      if (disposed || !coordinator) return;
+      if (
+        !Number.isFinite(range.x.min) ||
+        !Number.isFinite(range.x.max) ||
+        range.x.max <= range.x.min ||
+        !Number.isFinite(range.y.min) ||
+        !Number.isFinite(range.y.max) ||
+        range.y.max <= range.y.min
+      ) {
+        return;
+      }
+      currentOptions = {
+        ...currentOptions,
+        xAxis: { ...(currentOptions.xAxis ?? { type: 'value' }), min: range.x.min, max: range.x.max },
+        yAxis: { ...(currentOptions.yAxis ?? { type: 'value' }), min: range.y.min, max: range.y.max },
+      };
+      resolvedOptions = {
+        ...resolvedOptions,
+        xAxis: { ...resolvedOptions.xAxis, min: range.x.min, max: range.x.max },
+        yAxes: resolvedOptions.yAxes.map((axis, index) =>
+          index === 0 ? { ...axis, min: range.y.min, max: range.y.max } : axis
+        ),
+      };
+      coordinator.setViewRange(range);
     },
     appendData(seriesIndex, newPoints, options) {
       if (disposed) return;
