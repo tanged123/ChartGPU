@@ -14,6 +14,9 @@ export interface TextOverlayLabelOptions {
    * Rotation in degrees (CSS `rotate(<deg>deg)`).
    */
   readonly rotation?: number;
+  /** Optional backing drawn behind the label. */
+  readonly backgroundColor?: string;
+  readonly backgroundPadding?: number | readonly [number, number];
 }
 
 export interface TextOverlayOptions {
@@ -97,6 +100,8 @@ export function createTextOverlay(container: HTMLElement, options?: TextOverlayO
     fontWeight: string | number | undefined;
     anchor: TextOverlayAnchor;
     rotation: number;
+    backgroundColor: string | undefined;
+    backgroundPadding: number | readonly [number, number] | undefined;
   };
   const pending: PendingLabel[] = [];
   // Dummy span returned for API compat (callers may style it; canvas path ignores span).
@@ -131,6 +136,23 @@ export function createTextOverlay(container: HTMLElement, options?: TextOverlayO
       ctx.save();
       const weightPrefix = lab.fontWeight !== undefined && lab.fontWeight !== '' ? `${lab.fontWeight} ` : '';
       ctx.font = `${weightPrefix}${lab.fontSize}px ${lab.fontFamily}`;
+      const textWidth = ctx.measureText(lab.text).width;
+      const padding = typeof lab.backgroundPadding === 'number'
+        ? [lab.backgroundPadding, lab.backgroundPadding] as const
+        : lab.backgroundPadding ?? [0, 0] as const;
+      const [paddingX, paddingY] = padding;
+      if (lab.backgroundColor) {
+        const boxX = lab.anchor === 'middle' ? -textWidth / 2 : lab.anchor === 'end' ? -textWidth : 0;
+        const boxY = -lab.fontSize / 2;
+        ctx.save();
+        ctx.translate(lab.x, lab.y);
+        if (lab.rotation !== 0) {
+          ctx.rotate((lab.rotation * Math.PI) / 180);
+        }
+        ctx.fillStyle = lab.backgroundColor;
+        ctx.fillRect(boxX - paddingX, boxY - paddingY, textWidth + paddingX * 2, lab.fontSize + paddingY * 2);
+        ctx.restore();
+      }
       ctx.fillStyle = lab.color;
       ctx.textBaseline = 'middle';
       if (lab.anchor === 'middle') ctx.textAlign = 'center';
@@ -179,6 +201,8 @@ export function createTextOverlay(container: HTMLElement, options?: TextOverlayO
       fontWeight: options?.fontWeight,
       anchor: options?.anchor ?? 'start',
       rotation: options?.rotation ?? 0,
+      backgroundColor: options?.backgroundColor,
+      backgroundPadding: options?.backgroundPadding,
     });
     scheduleFlush();
     return dummySpan;

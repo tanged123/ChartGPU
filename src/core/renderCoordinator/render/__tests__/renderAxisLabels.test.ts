@@ -42,7 +42,13 @@ function createMockTextOverlay() {
     text: string;
     x: number;
     y: number;
-    options?: { anchor?: string; rotation?: number; fontWeight?: string | number };
+    options?: {
+      anchor?: string;
+      rotation?: number;
+      fontWeight?: string | number;
+      backgroundColor?: string;
+      backgroundPadding?: number | readonly [number, number];
+    };
   }> = [];
   return {
     labels,
@@ -53,7 +59,13 @@ function createMockTextOverlay() {
           text: string,
           x: number,
           y: number,
-          options?: { anchor?: string; rotation?: number; fontWeight?: string | number }
+          options?: {
+            anchor?: string;
+            rotation?: number;
+            fontWeight?: string | number;
+            backgroundColor?: string;
+            backgroundPadding?: number | readonly [number, number];
+          }
         ) => {
           labels.push({ text, x, y, options });
           return createMockSpan(text);
@@ -142,6 +154,24 @@ function createMinimalContext(overrides: Partial<AxisLabelRenderContext> = {}): 
 
 describe('renderAxisLabels', () => {
   describe('x-axis tick anchors', () => {
+    it('places inline ticks on the plot rail with backing and a corner title', () => {
+      const { overlay, labels } = createMockTextOverlay();
+      const context = createMinimalContext({
+        currentOptions: {
+          ...createMinimalContext().currentOptions,
+          xAxis: { type: 'value' as const, inside: true, name: 'time (s)' },
+        } as any,
+      });
+
+      renderAxisLabels(overlay as any, {} as HTMLElement, context);
+
+      const tick = labels.find((label) => /^\d/.test(label.text));
+      const title = labels.find((label) => label.text === 'time (s)');
+      expect(tick?.options?.backgroundColor).toBe('rgba(0,0,0,0.86)');
+      expect(tick?.options?.backgroundPadding).toEqual([3, 1]);
+      expect(title?.options?.anchor).toBe('end');
+    });
+
     it('centers first/last labels when nice ticks are inset from plot rails (streaming value X)', () => {
       const { overlay, labels } = createMockTextOverlay();
       const container = {} as HTMLElement;
@@ -246,6 +276,24 @@ describe('renderAxisLabels', () => {
   });
 
   describe('y-axis tickFormatter', () => {
+    it('places inline Y ticks inside the plot with a backing and a corner name tag', () => {
+      const { overlay, labels } = createMockTextOverlay();
+      const context = createMinimalContext({
+        currentOptions: {
+          ...createMinimalContext().currentOptions,
+          yAxes: [{ id: 'primary', type: 'value' as const, inside: true, name: 'value' }],
+        } as any,
+      });
+
+      renderYAxisLabels(makeYCtx(overlay, {} as HTMLElement, context));
+
+      const tick = labels.find((label) => /^\d/.test(label.text));
+      const title = labels.find((label) => label.text === 'value');
+      expect(tick?.options?.backgroundColor).toBe('rgba(0,0,0,0.86)');
+      expect(title?.options?.anchor).toBe('start');
+      expect(title?.options?.rotation).toBeUndefined();
+    });
+
     it('uses custom tickFormatter for y-axis labels', () => {
       const { overlay, labels } = createMockTextOverlay();
       const container = {} as HTMLElement;

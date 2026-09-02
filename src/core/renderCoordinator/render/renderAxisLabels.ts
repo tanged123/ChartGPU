@@ -22,6 +22,7 @@ import {
   generateValueAxisTicks,
 } from '../axis/computeAxisTicks';
 import { AXIS_TITLE_FONT_WEIGHT, getAxisTitleFontSize, styleAxisLabelSpan } from '../../../utils/axisLabelStyling';
+import { parseCssColorToRgba01 } from '../../../utils/colors';
 import {
   getRightYAxisLabelX,
   getYAxisLabelX,
@@ -33,6 +34,13 @@ import {
 const DEFAULT_TICK_LENGTH_CSS_PX = 6;
 const LABEL_PADDING_CSS_PX = 4;
 const DEFAULT_TICK_COUNT = 5;
+
+function inlineBackingColor(color: string): string {
+  const rgba = parseCssColorToRgba01(color);
+  return rgba
+    ? `rgba(${Math.round(rgba[0] * 255)},${Math.round(rgba[1] * 255)},${Math.round(rgba[2] * 255)},0.86)`
+    : color;
+}
 
 /** Cached 2d measure context — avoid createElement('canvas') on every Y label pass. */
 let sharedMeasureCanvas: HTMLCanvasElement | null = null;
@@ -130,7 +138,10 @@ export function renderAxisLabels(
   const xFontSize = currentOptions.theme.fontSize;
   // textBaseline middle: keep full glyph inside canvas (overflow:hidden shells clip flush bottoms).
   const maxXLabelCenterY = canvasCssHeight - xFontSize * 0.5 - 1;
-  const xLabelY = Math.min(plotBottomCss + xTickLengthCssPx + LABEL_PADDING_CSS_PX + xFontSize * 0.5, maxXLabelCenterY);
+  const inline = currentOptions.xAxis.inside === true;
+  const xLabelY = inline
+    ? Math.max(xFontSize * 0.5 + 1, plotBottomCss - xFontSize * 0.5 - LABEL_PADDING_CSS_PX)
+    : Math.min(plotBottomCss + xTickLengthCssPx + LABEL_PADDING_CSS_PX + xFontSize * 0.5, maxXLabelCenterY);
   const isTimeXAxis = currentOptions.xAxis.type === 'time';
   const isLogXAxis = currentOptions.xAxis.type === 'log';
   const xLogBase = currentOptions.xAxis.logBase ?? 10;
@@ -173,6 +184,9 @@ export function renderAxisLabels(
       color: currentOptions.theme.textColor,
       fontFamily: currentOptions.theme.fontFamily,
       anchor,
+      ...(inline
+        ? { backgroundColor: inlineBackingColor(currentOptions.theme.backgroundColor), backgroundPadding: [3, 1] as const }
+        : {}),
     });
     styleAxisLabelSpan(span, false, currentOptions.theme);
   }
@@ -181,13 +195,15 @@ export function renderAxisLabels(
   const axisNameFontSize = getAxisTitleFontSize(xFontSize);
   const xAxisName = currentOptions.xAxis.name?.trim() ?? '';
   if (xAxisName.length > 0) {
-    const xCenter = (plotLeftCss + plotRightCss) / 2;
+    const xCenter = inline ? plotRightCss - LABEL_PADDING_CSS_PX : (plotLeftCss + plotRightCss) / 2;
     const xTickLabelsBottom = xLabelY + xFontSize * 0.5;
     const hasSliderZoom = currentOptions.dataZoom?.some((z) => z?.type === 'slider') ?? false;
     const sliderTrackHeightCssPx = 32;
     const bottomLimitCss = hasSliderZoom ? canvasCssHeight - sliderTrackHeightCssPx : canvasCssHeight;
     const maxXTitleCenterY = bottomLimitCss - axisNameFontSize * 0.5 - 1;
-    const xTitleY = Math.min(
+    const xTitleY = inline
+      ? Math.max(axisNameFontSize * 0.5 + 1, plotBottomCss - axisNameFontSize * 1.5 - LABEL_PADDING_CSS_PX)
+      : Math.min(
       Math.max(
         xTickLabelsBottom + LABEL_PADDING_CSS_PX + axisNameFontSize * 0.5,
         (xTickLabelsBottom + bottomLimitCss) / 2
@@ -200,7 +216,10 @@ export function renderAxisLabels(
       color: currentOptions.theme.textColor,
       fontFamily: currentOptions.theme.fontFamily,
       fontWeight: AXIS_TITLE_FONT_WEIGHT,
-      anchor: 'middle',
+      anchor: inline ? 'end' : 'middle',
+      ...(inline
+        ? { backgroundColor: inlineBackingColor(currentOptions.theme.backgroundColor), backgroundPadding: [3, 1] as const }
+        : {}),
     });
     styleAxisLabelSpan(span, true, currentOptions.theme);
   }
@@ -253,9 +272,14 @@ export function renderYAxisLabels(ctx: YAxisLabelRenderContext): void {
   const yTickStep = yTickCount <= 1 ? 0 : Math.abs(yTickValues[Math.min(1, yTickCount - 1)]! - yTickValues[0]!);
   const yFormatter = isLogY ? null : createTickFormatter(yTickStep);
 
-  const yLabelX = isRight
-    ? getRightYAxisLabelX(plotRightCss, yTickLengthCssPx)
-    : getYAxisLabelX(plotLeftCss, yTickLengthCssPx);
+  const inline = yAxisConfig.inside === true;
+  const yLabelX = inline
+    ? isRight
+      ? plotRightCss - yTickLengthCssPx - LABEL_PADDING_CSS_PX
+      : plotLeftCss + yTickLengthCssPx + LABEL_PADDING_CSS_PX
+    : isRight
+      ? getRightYAxisLabelX(plotRightCss, yTickLengthCssPx)
+      : getYAxisLabelX(plotLeftCss, yTickLengthCssPx);
 
   const yTickFormatter = yAxisConfig.tickFormatter;
   // Canvas text overlay returns a dummy span — measure tick widths via cached 2d context
@@ -285,7 +309,10 @@ export function renderYAxisLabels(ctx: YAxisLabelRenderContext): void {
       fontSize: theme.fontSize,
       color: theme.textColor,
       fontFamily: theme.fontFamily,
-      anchor: isRight ? 'start' : 'end',
+      anchor: inline ? (isRight ? 'end' : 'start') : isRight ? 'start' : 'end',
+      ...(inline
+        ? { backgroundColor: inlineBackingColor(theme.backgroundColor), backgroundPadding: [3, 1] as const }
+        : {}),
     });
     styleAxisLabelSpan(span, false, theme);
   }
@@ -296,13 +323,18 @@ export function renderYAxisLabels(ctx: YAxisLabelRenderContext): void {
     // Center sits a full fontSize + padding above plot top so the header em-box clears
     // the top domain tick (textBaseline middle places tick center at plotTopCss).
     // AABB gap to top tick ≈ LABEL_PADDING + fontSize/2 (grows with theme.fontSize).
-    const headerY = plotTopCss - LABEL_PADDING_CSS_PX - theme.fontSize;
+    const headerY = inline
+      ? plotTopCss + theme.fontSize * 0.5 + LABEL_PADDING_CSS_PX
+      : plotTopCss - LABEL_PADDING_CSS_PX - theme.fontSize;
     const span = axisLabelOverlay.addLabel(yAxisHeader, offsetX + yLabelX, offsetY + headerY, {
       fontSize: theme.fontSize,
       color: theme.textColor,
       fontFamily: theme.fontFamily,
       fontWeight: AXIS_TITLE_FONT_WEIGHT,
-      anchor: isRight ? 'start' : 'end',
+      anchor: inline ? (isRight ? 'end' : 'start') : isRight ? 'start' : 'end',
+      ...(inline
+        ? { backgroundColor: inlineBackingColor(theme.backgroundColor), backgroundPadding: [3, 1] as const }
+        : {}),
     });
     styleAxisLabelSpan(span, true, theme);
   }
@@ -312,6 +344,25 @@ export function renderYAxisLabels(ctx: YAxisLabelRenderContext): void {
   const yAxisName = yAxisConfig.name?.trim() ?? '';
   if (yAxisName.length > 0) {
     const yCenter = (plotTopCss + plotBottomCss) / 2;
+
+    if (inline) {
+      const span = axisLabelOverlay.addLabel(
+        yAxisName,
+        offsetX + (isRight ? plotRightCss - LABEL_PADDING_CSS_PX : plotLeftCss + LABEL_PADDING_CSS_PX),
+        offsetY + plotTopCss + axisNameFontSize * 0.5 + LABEL_PADDING_CSS_PX,
+        {
+          fontSize: axisNameFontSize,
+          color: theme.textColor,
+          fontFamily: theme.fontFamily,
+          fontWeight: AXIS_TITLE_FONT_WEIGHT,
+          anchor: isRight ? 'end' : 'start',
+          backgroundColor: inlineBackingColor(theme.backgroundColor),
+          backgroundPadding: [3, 1],
+        },
+      );
+      styleAxisLabelSpan(span, true, theme);
+      return;
+    }
 
     const yTitleX = isRight
       ? getRightYAxisTitleX(yLabelX, maxTickLabelWidth, axisNameFontSize)

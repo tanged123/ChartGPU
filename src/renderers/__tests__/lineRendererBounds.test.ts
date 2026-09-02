@@ -121,6 +121,29 @@ describe('createLineRenderer uniform dirty-skip (issue 2.5)', () => {
     expect(writeUniform.mock.calls.length).toBeGreaterThan(0);
     renderer.dispose();
   });
+
+  it('updates the fragment uniform when the dash mode changes', () => {
+    const device = createMockDevice();
+    const writeUniform = writeUniformBuffer as ReturnType<typeof vi.fn>;
+    writeUniform.mockClear();
+    const renderer = createLineRenderer(device);
+    const data: DataPoint[] = [[0, 1], [1, 2]];
+    const series = makeSeries(data);
+    const buf = { size: 64 } as unknown as GPUBuffer;
+    const x = createLinearScale().domain(0, 1).range(-1, 1);
+    const y = createLinearScale().domain(0, 2).range(-1, 1);
+
+    renderer.prepare(series, buf, x, y, 0, 1, 800, 600);
+    const solidWriteCount = writeUniform.mock.calls.length;
+    const dotted = { ...series, lineStyle: { ...series.lineStyle, dash: 'dot' } } as ResolvedLineSeriesConfig;
+    renderer.prepare(dotted, buf, x, y, 0, 1, 800, 600);
+
+    expect(writeUniform.mock.calls.length).toBeGreaterThan(solidWriteCount);
+    const fragmentWrite = writeUniform.mock.calls.at(-1)?.[2] as Float32Array;
+    expect(fragmentWrite.byteLength).toBe(32);
+    expect(new Uint32Array(fragmentWrite.buffer, fragmentWrite.byteOffset, 8)[4]).toBe(2);
+    renderer.dispose();
+  });
 });
 
 describe('createLineRenderer bounds (P2-5)', () => {
@@ -1046,5 +1069,14 @@ describe('line.wgsl hairline gap contract (Issue 1 review)', () => {
     // Endpoints may be named pA/pB or pA_raw/pB_raw (log-projection path).
     expect(hairBody).toMatch(/pA(_raw)?\.x != pA(_raw)?\.x/);
     expect(hairBody).toMatch(/pB(_raw)?\.x != pB(_raw)?\.x/);
+  });
+
+  it('contains dash coverage and passes a dash mode uniform to both line paths', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.resolve(__dirname, '../../shaders/line.wgsl'), 'utf8');
+    expect(src).toMatch(/dashMode/);
+    expect(src).toMatch(/dashCoverage/);
+    expect(src).toMatch(/fsMainHairline/);
   });
 });

@@ -44,6 +44,9 @@ struct VSUniforms {
 
 struct FSUniforms {
   color : vec4<f32>,
+  // 0 = solid, 1 = dash, 2 = dot; trailing fields keep the uniform 16-byte aligned.
+  dashMode : u32,
+  _pad0 : vec3<u32>,
 };
 
 @group(0) @binding(1) var<uniform> fsUniforms : FSUniforms;
@@ -54,6 +57,7 @@ struct VSOut {
   @builtin(position) clipPosition : vec4<f32>,
   @location(0) acrossDevice       : f32,
   @location(1) @interpolate(flat) widthDevice : f32,
+  @location(2) dashPositionCss : f32,
 };
 
 // Map chronological (logical) index → physical storage. After maxPoints wrap,
@@ -140,6 +144,7 @@ fn vsMain(
     out.clipPosition = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     out.acrossDevice = 0.0;
     out.widthDevice = 0.0;
+    out.dashPositionCss = 0.0;
     return out;
   }
 
@@ -174,6 +179,7 @@ fn vsMain(
     out.clipPosition = clipA;
     out.acrossDevice = 0.0;
     out.widthDevice = 0.0;
+    out.dashPositionCss = 0.0;
     return out;
   }
 
@@ -212,7 +218,22 @@ fn vsMain(
   out.clipPosition = vec4<f32>(clipX, clipY, 0.0, 1.0);
   out.acrossDevice = acrossDeviceVal;
   out.widthDevice = widthDevice;
+  out.dashPositionCss = baseScreen.x / dpr;
   return out;
+}
+
+fn dashCoverage(positionCss : f32) -> f32 {
+  if (fsUniforms.dashMode == 0u) {
+    return 1.0;
+  }
+  let onLength = select(6.0, 1.5, fsUniforms.dashMode == 2u);
+  let offLength = select(4.0, 3.0, fsUniforms.dashMode == 2u);
+  let period = onLength + offLength;
+  let phase = positionCss - floor(positionCss / period) * period;
+  let active = phase < onLength;
+  let edge = min(phase, onLength - phase);
+  let aa = max(fwidth(positionCss), 0.5);
+  return select(0.0, smoothstep(0.0, aa, edge), active);
 }
 
 @fragment
@@ -234,9 +255,10 @@ fn fsMain(in : VSOut) -> @location(0) vec4<f32> {
   // Combine: paddingCoverage handles the SDF fade, edgeCoverage handles the outer trim.
   // For thin lines (< 1 device px), paddingCoverage alone provides the desired fade.
   let coverage = min(edgeCoverage, paddingCoverage);
+  let dash = dashCoverage(in.dashPositionCss);
 
   var color = fsUniforms.color;
-  color = vec4<f32>(color.rgb, color.a * coverage);
+  color = vec4<f32>(color.rgb, color.a * coverage * dash);
   return color;
 }
 
@@ -267,6 +289,7 @@ fn vsMainHairline(
     out.clipPosition = vec4<f32>(0.0, 0.0, 0.0, 0.0);
     out.acrossDevice = 0.0;
     out.widthDevice = 0.0;
+    out.dashPositionCss = 0.0;
     return out;
   }
   let pA = projectData(pA_raw);
@@ -280,10 +303,12 @@ fn vsMainHairline(
   // Solid coverage for fsMainHairline (varyings unused except color path).
   out.acrossDevice = 1.0;
   out.widthDevice = 1.0;
+  let dpr = max(vsUniforms.devicePixelRatio, 1e-6);
+  out.dashPositionCss = ((clip.x / clip.w * 0.5 + 0.5) * vsUniforms.canvasSize.x) / dpr;
   return out;
 }
 
 @fragment
-fn fsMainHairline(_in : VSOut) -> @location(0) vec4<f32> {
-  return fsUniforms.color;
+fn fsMainHairline(in : VSOut) -> @location(0) vec4<f32> {
+  return vec4<f32>(fsUniforms.color.rgb, fsUniforms.color.a * dashCoverage(in.dashPositionCss));
 }

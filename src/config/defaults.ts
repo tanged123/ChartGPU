@@ -47,6 +47,7 @@ export const defaultPalette = [
 export const defaultLineStyle = {
   width: 2,
   opacity: 1,
+  dash: 'solid' as const,
 } as const satisfies Required<Omit<LineStyleConfig, 'color'>>;
 
 export const defaultAreaStyle = {

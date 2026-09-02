@@ -202,7 +202,8 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
   const vsUniformBuffer = createUniformBuffer(device, 112, {
     label: 'lineRenderer/vsUniforms',
   });
-  const fsUniformBuffer = createUniformBuffer(device, 16, {
+  // Color plus dash mode and alignment padding (WGSL uniform structs are 16-byte aligned).
+  const fsUniformBuffer = createUniformBuffer(device, 32, {
     label: 'lineRenderer/fsUniforms',
   });
 
@@ -210,7 +211,9 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
   const vsUniformScratchBuffer = new ArrayBuffer(112);
   const vsUniformScratchF32 = new Float32Array(vsUniformScratchBuffer);
   const vsUniformScratchU32 = new Uint32Array(vsUniformScratchBuffer);
-  const fsUniformScratchF32 = new Float32Array(4);
+  const fsUniformScratchBuffer = new ArrayBuffer(32);
+  const fsUniformScratchF32 = new Float32Array(fsUniformScratchBuffer);
+  const fsUniformScratchU32 = new Uint32Array(fsUniformScratchBuffer);
 
   // Bind group is cached by the current `dataBuffer` reference. A new bind group is created only
   // when the buffer identity changes (e.g. DataStore reallocates on growth). `queue.writeBuffer`
@@ -223,6 +226,7 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
   let lastFsG = Number.NaN;
   let lastFsB = Number.NaN;
   let lastFsA = Number.NaN;
+  let lastDashMode = -1;
   let lastColorKey: string | null = null;
   let lastBaseR = Number.NaN;
   let lastBaseG = Number.NaN;
@@ -601,17 +605,20 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
     const g = lastBaseG;
     const b = lastBaseB;
     const fa = clamp01(lastBaseA * opacity);
+    const dashMode = seriesConfig.lineStyle.dash === 'dash' ? 1 : seriesConfig.lineStyle.dash === 'dot' ? 2 : 0;
     // `fa` already folds opacity; no separate lastOpacity key.
-    if (lastFsR !== r || lastFsG !== g || lastFsB !== b || lastFsA !== fa) {
+    if (lastFsR !== r || lastFsG !== g || lastFsB !== b || lastFsA !== fa || lastDashMode !== dashMode) {
       fsUniformScratchF32[0] = r;
       fsUniformScratchF32[1] = g;
       fsUniformScratchF32[2] = b;
       fsUniformScratchF32[3] = fa;
+      fsUniformScratchU32[4] = dashMode;
       writeUniformBuffer(device, fsUniformBuffer, fsUniformScratchF32);
       lastFsR = r;
       lastFsG = g;
       lastFsB = b;
       lastFsA = fa;
+      lastDashMode = dashMode;
     }
 
     // Rebuild bind group when data buffer or VS buffer (shared vs private) changes.

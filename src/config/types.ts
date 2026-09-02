@@ -280,6 +280,8 @@ export interface GridConfig {
 export interface AxisConfig {
   readonly id?: string;
   readonly position?: 'left' | 'right';
+  /** Render tick labels and the axis name inside the plot area. */
+  readonly inside?: boolean;
   readonly type: AxisType;
   readonly min?: number;
   readonly max?: number;
@@ -361,6 +363,7 @@ export interface LineStyleConfig {
   readonly width?: number;
   readonly opacity?: number;
   readonly color?: string;
+  readonly dash?: 'solid' | 'dash' | 'dot';
 }
 
 export interface AreaStyleConfig {

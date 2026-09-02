@@ -1592,6 +1592,23 @@ describe('OptionResolver - heatmap', () => {
   });
 });
 
+describe('OptionResolver - line stroke styles', () => {
+  it('resolves solid by default and preserves dash/dot styles', () => {
+    const resolved = resolveOptions({
+      series: [
+        { type: 'line', data: [[0, 1], [1, 2]] },
+        { type: 'line', data: [[0, 1], [1, 2]], lineStyle: { dash: 'dash' } },
+        { type: 'line', data: [[0, 1], [1, 2]], lineStyle: { dash: 'dot' } },
+      ],
+    });
+    expect(resolved.series.map((series) => series.type === 'line' ? series.lineStyle.dash : null)).toEqual([
+      'solid',
+      'dash',
+      'dot',
+    ]);
+  });
+});
+
 describe('OptionResolver - band', () => {
   it('resolves defaults: connectNulls false, areaStyle opacity 0.25, omit lineStyle = fill-only', () => {
     const resolved = resolveOptions({
