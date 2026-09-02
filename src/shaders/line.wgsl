@@ -225,6 +225,8 @@ fn vsMain(
 }
 
 fn dashCoverage(positionCss : f32) -> f32 {
+  // Derivatives must be evaluated in uniform control flow on every backend.
+  let aa = max(fwidth(positionCss), 0.5);
   if (fsUniforms.dashMode == 0u) {
     return 1.0;
   }
@@ -232,10 +234,9 @@ fn dashCoverage(positionCss : f32) -> f32 {
   let offLength = select(4.0, 3.0, fsUniforms.dashMode == 2u);
   let period = onLength + offLength;
   let phase = positionCss - floor(positionCss / period) * period;
-  let active = phase < onLength;
+  let isActive = phase < onLength;
   let edge = min(phase, onLength - phase);
-  let aa = max(fwidth(positionCss), 0.5);
-  return select(0.0, smoothstep(0.0, aa, edge), active);
+  return select(0.0, smoothstep(0.0, aa, edge), isActive);
 }
 
 @fragment
