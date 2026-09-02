@@ -46,7 +46,9 @@ struct FSUniforms {
   color : vec4<f32>,
   // 0 = solid, 1 = dash, 2 = dot; trailing fields keep the uniform 16-byte aligned.
   dashMode : u32,
-  _pad0 : vec3<u32>,
+  _pad0 : u32,
+  _pad1 : u32,
+  _pad2 : u32,
 };
 
 @group(0) @binding(1) var<uniform> fsUniforms : FSUniforms;
