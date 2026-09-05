@@ -2658,6 +2658,9 @@ export async function createChartGPU(
       if (seriesIndex < 0 || seriesIndex >= resolvedOptions.series.length) return;
 
       const s = resolvedOptions.series[seriesIndex]!;
+      if (s.type === 'line' && s.pointColors !== undefined) {
+        throw new Error('line pointColors requires atomic data replacement through setOption');
+      }
       if (s.type === 'pie' || s.type === 'heatmap') {
         if (!warnedPieAppendSeries.has(seriesIndex)) {
           warnedPieAppendSeries.add(seriesIndex);

@@ -399,6 +399,10 @@ export interface SeriesConfigBase {
 }
 
 export interface LineSeriesConfig extends SeriesConfigBase {
+  /** Immutable RGBA per unsampled point. Negative alpha uses the solid stroke fallback for adjacent segments.
+   * Requires sampling:none, animation:false, no step/connectNulls/fill or streaming append.
+   */
+  readonly pointColors?: Float32Array | undefined;
   readonly type: 'line';
   readonly lineStyle?: LineStyleConfig;
   /**

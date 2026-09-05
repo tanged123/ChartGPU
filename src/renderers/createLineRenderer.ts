@@ -1,3 +1,4 @@
+import { createLinePointColors } from './linePointColors';
 import lineWgsl from '../shaders/line.wgsl?raw';
 import type { ResolvedLineSeriesConfig } from '../config/OptionResolver';
 import type { ContinuousScale } from '../utils/scales';
@@ -170,6 +171,11 @@ function getLineBindGroupLayout(device: GPUDevice): GPUBindGroupLayout {
         buffer: { type: 'uniform' },
       },
       {
+        binding: 3,
+        visibility: GPUShaderStage.VERTEX,
+        buffer: { type: 'read-only-storage' },
+      },
+      {
         binding: 2,
         visibility: GPUShaderStage.VERTEX,
         buffer: { type: 'read-only-storage' },
@@ -188,6 +194,8 @@ function getLineBindGroupLayout(device: GPUDevice): GPUBindGroupLayout {
 
 export function createLineRenderer(device: GPUDevice, options?: LineRendererOptions): LineRenderer {
   let disposed = false;
+  const pointColors = createLinePointColors(device);
+  let boundColors: GPUBuffer | null = null;
   const targetFormat = options?.targetFormat ?? DEFAULT_TARGET_FORMAT;
   // Be resilient: coerce invalid values to 1 (no MSAA).
   const sampleCountRaw = options?.sampleCount ?? 1;
@@ -450,6 +458,12 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
         ? Math.floor(pointCountOverride)
         : getPointCount(seriesConfig.data);
 
+    if (
+      seriesConfig.pointColors !== undefined &&
+      (seriesConfig.pointColors.length !== currentPointCount * 4 || (ringLayout?.capacity ?? 0) > 0)
+    )
+      throw new Error('line pointColors cannot be sampled or streamed');
+    const colorsBuffer = pointColors.prepare(seriesConfig.pointColors);
     // X: packed-origin affine (stable for epoch-ms time axes; log X uses log-space affine).
     // Y: linear samples (0,1); log Y solves affine in log space (never sample raw 0,1 on log).
     const { a: ax, b: bxPacked } = computePackedXAffineFromScale(xScale, xOffset);
@@ -483,7 +497,7 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
       lineWidthCssPx: nominalLineWidthCss,
       lineSeriesCount,
       msaaSampleCount: sampleCount,
-      forceStandard: forceStandardDraw === true,
+      forceStandard: seriesConfig.pointColors !== undefined || forceStandardDraw === true,
     });
     currentDrawPolicy = drawPolicy.policy;
     const lineWidthCss = drawPolicy.effectiveLineWidthCssPx;
@@ -499,7 +513,8 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
       pointCount: currentPointCount,
       plotWidthDevicePx: plotWForLod,
       // Only stride when already on the dense hairline path (or forceStandard).
-      forceStandard: forceStandardDraw === true || drawPolicy.policy !== 'denseHairline',
+      forceStandard:
+        seriesConfig.pointColors !== undefined || forceStandardDraw === true || drawPolicy.policy !== 'denseHairline',
     });
     currentLodStride = denseStride.stride;
     currentDrawSegmentCount = denseStride.drawSegmentCount;
@@ -622,15 +637,22 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
     }
 
     // Rebuild bind group when data buffer or VS buffer (shared vs private) changes.
-    if (currentBindGroup === null || boundDataBuffer !== drawDataBuffer || boundVsBuffer !== vsBufferForBind) {
+    if (
+      currentBindGroup === null ||
+      boundDataBuffer !== drawDataBuffer ||
+      boundVsBuffer !== vsBufferForBind ||
+      boundColors !== colorsBuffer
+    ) {
       currentBindGroup = device.createBindGroup({
         layout: bindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: vsBufferForBind } },
           { binding: 1, resource: { buffer: fsUniformBuffer } },
           { binding: 2, resource: { buffer: drawDataBuffer } },
+          { binding: 3, resource: { buffer: colorsBuffer } },
         ],
       });
+      boundColors = colorsBuffer;
       boundDataBuffer = drawDataBuffer;
       boundVsBuffer = vsBufferForBind;
     }
@@ -687,6 +709,7 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
   const dispose: LineRenderer['dispose'] = () => {
     if (disposed) return;
     disposed = true;
+    pointColors.dispose();
 
     currentBindGroup = null;
     boundDataBuffer = null;

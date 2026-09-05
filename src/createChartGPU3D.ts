@@ -210,6 +210,10 @@ export async function createChartGPU3D(
       coordinator?.setOptions(resolvedOptions);
       requestRender();
     },
+    setViewRange() {
+      if (disposed) return;
+      throw new Error('setViewRange is only available for Cartesian 2D charts');
+    },
     getHitTestStoreRebuildCount: () => 0,
     getHitTestSeriesPointCount: () => 0,
     appendData(seriesIndex, newPoints, opts?) {

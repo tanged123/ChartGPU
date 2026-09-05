@@ -55,11 +55,22 @@ struct FSUniforms {
 
 @group(0) @binding(2) var<storage, read> points : array<vec2<f32>>;
 
+@group(0) @binding(3) var<storage, read> pointColors : array<vec4<f32>>;
+
+fn segmentColor(a: u32, b: u32, t: f32) -> vec4<f32> {
+  if (arrayLength(&pointColors) <= b) { return vec4<f32>(0.0, 0.0, 0.0, -1.0); }
+  let ca = pointColors[a];
+  let cb = pointColors[b];
+  if (ca.a < 0.0 || cb.a < 0.0) { return vec4<f32>(0.0, 0.0, 0.0, -1.0); }
+  return mix(ca, cb, t);
+}
+
 struct VSOut {
   @builtin(position) clipPosition : vec4<f32>,
   @location(0) acrossDevice       : f32,
   @location(1) @interpolate(flat) widthDevice : f32,
   @location(2) dashPositionCss : f32,
+  @location(3) pointColor : vec4<f32>,
 };
 
 // Map chronological (logical) index → physical storage. After maxPoints wrap,
@@ -221,6 +232,7 @@ fn vsMain(
   out.acrossDevice = acrossDeviceVal;
   out.widthDevice = widthDevice;
   out.dashPositionCss = baseScreen.x / dpr;
+  out.pointColor = segmentColor(i0, i1, uv.x);
   return out;
 }
 
@@ -261,6 +273,7 @@ fn fsMain(in : VSOut) -> @location(0) vec4<f32> {
   let dash = dashCoverage(in.dashPositionCss);
 
   var color = fsUniforms.color;
+  if (in.pointColor.a >= 0.0) { color = vec4<f32>(in.pointColor.rgb, in.pointColor.a * color.a); }
   color = vec4<f32>(color.rgb, color.a * coverage * dash);
   return color;
 }
@@ -303,6 +316,7 @@ fn vsMainHairline(
   let clip = vsUniforms.transform * vec4<f32>(p, 0.0, 1.0);
   var out: VSOut;
   out.clipPosition = clip;
+  out.pointColor = segmentColor(i0, i1, f32(vid));
   // Solid coverage for fsMainHairline (varyings unused except color path).
   out.acrossDevice = 1.0;
   out.widthDevice = 1.0;
@@ -313,5 +327,7 @@ fn vsMainHairline(
 
 @fragment
 fn fsMainHairline(in : VSOut) -> @location(0) vec4<f32> {
-  return vec4<f32>(fsUniforms.color.rgb, fsUniforms.color.a * dashCoverage(in.dashPositionCss));
+  var color = fsUniforms.color;
+  if (in.pointColor.a >= 0.0) { color = vec4<f32>(in.pointColor.rgb, in.pointColor.a * color.a); }
+  return vec4<f32>(color.rgb, color.a * dashCoverage(in.dashPositionCss));
 }

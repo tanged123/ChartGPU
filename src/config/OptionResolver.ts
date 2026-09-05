@@ -1,3 +1,4 @@
+import { validateLinePointColors } from './linePointColors';
 import type {
   AreaStyleConfig,
   AnnotationConfig,
@@ -2311,6 +2312,7 @@ export function resolveOptions(
               };
             }
             case 'line': {
+              validateLinePointColors(s, sampling, animation);
               // Resolve effective stroke color with precedence: lineStyle.color → series.color → palette
               const lineStyleColor = normalizeOptionalColor(s.lineStyle?.color);
               const effectiveStrokeColor = lineStyleColor ?? explicitColor ?? inheritedColor;
@@ -2318,7 +2320,10 @@ export function resolveOptions(
               const lineStyle: ResolvedLineStyleConfig = {
                 width: s.lineStyle?.width ?? defaultLineStyle.width,
                 opacity: s.lineStyle?.opacity ?? defaultLineStyle.opacity,
-                dash: s.lineStyle?.dash === 'dash' || s.lineStyle?.dash === 'dot' ? s.lineStyle.dash : defaultLineStyle.dash,
+                dash:
+                  s.lineStyle?.dash === 'dash' || s.lineStyle?.dash === 'dot'
+                    ? s.lineStyle.dash
+                    : defaultLineStyle.dash,
                 color: effectiveStrokeColor,
               };
 
@@ -2621,7 +2626,10 @@ export function resolveOptions(
                 lineStyle = {
                   width: s.lineStyle.width ?? 1,
                   opacity: s.lineStyle.opacity ?? defaultLineStyle.opacity,
-                  dash: s.lineStyle.dash === 'dash' || s.lineStyle.dash === 'dot' ? s.lineStyle.dash : defaultLineStyle.dash,
+                  dash:
+                    s.lineStyle.dash === 'dash' || s.lineStyle.dash === 'dot'
+                      ? s.lineStyle.dash
+                      : defaultLineStyle.dash,
                   color: effectiveStrokeColor,
                 };
               }
@@ -2633,7 +2641,10 @@ export function resolveOptions(
                 lineStyleY1 = {
                   width: s.lineStyleY1.width ?? 1,
                   opacity: s.lineStyleY1.opacity ?? defaultLineStyle.opacity,
-                  dash: s.lineStyleY1.dash === 'dash' || s.lineStyleY1.dash === 'dot' ? s.lineStyleY1.dash : defaultLineStyle.dash,
+                  dash:
+                    s.lineStyleY1.dash === 'dash' || s.lineStyleY1.dash === 'dot'
+                      ? s.lineStyleY1.dash
+                      : defaultLineStyle.dash,
                   color: y1Color,
                 };
               }
@@ -3039,7 +3050,10 @@ export function resolveOptions(
                 lineStyle: {
                   width: stemWidth,
                   opacity,
-                  dash: imp.lineStyle?.dash === 'dash' || imp.lineStyle?.dash === 'dot' ? imp.lineStyle.dash : defaultLineStyle.dash,
+                  dash:
+                    imp.lineStyle?.dash === 'dash' || imp.lineStyle?.dash === 'dot'
+                      ? imp.lineStyle.dash
+                      : defaultLineStyle.dash,
                   color: effectiveStrokeColor,
                 } satisfies ResolvedLineStyleConfig,
                 showMarker,
