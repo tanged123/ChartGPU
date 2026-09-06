@@ -271,7 +271,7 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
     },
   };
 
-  // Standard path: screen-space AA quads (6 verts/segment).
+  // Standard path: one independent four-vertex strip per segment.
   const pipeline = createRenderPipeline(
     device,
     {
@@ -289,7 +289,7 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
         // Enable standard alpha blending so per-series `lineStyle.opacity` and AA transparency work.
         blend: blendState,
       },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
+      primitive: { topology: 'triangle-strip', cullMode: 'none' },
       multisample: { count: sampleCount },
     },
     pipelineCache
@@ -678,8 +678,8 @@ export function createLineRenderer(device: GPUDevice, options?: LineRendererOpti
 
     passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, currentBindGroup);
-    // 6 vertices per instance (quad); standard path keeps stride 1 → N−1 segments.
-    passEncoder.draw(6, currentDrawSegmentCount);
+    // Each instance restarts its strip; adjacent segments never share triangles.
+    passEncoder.draw(4, currentDrawSegmentCount);
   };
 
   const isDenseHairline: LineRenderer['isDenseHairline'] = () => {

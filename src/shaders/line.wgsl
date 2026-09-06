@@ -1,7 +1,7 @@
 // line.wgsl — Screen-space quad expansion with SDF-based anti-aliasing.
 //
 // Each "instance" draws one line segment (point[i] → point[i+1]).
-// 6 vertices per instance (2 triangles = 1 quad per segment).
+// 4 vertices per instance (2 triangles = 1 quad per segment).
 //
 // The vertex shader:
 //   1. Reads endpoints from a storage buffer.
@@ -116,7 +116,7 @@ fn projectData(p : vec2<f32>) -> vec2<f32> {
   return vec2<f32>(x, y);
 }
 
-// Returns UV for the 6 vertices of a quad (2 triangles):
+// Returns UV for the four corners of an instanced triangle strip:
 //   uv.x: 0 → endpoint A, 1 → endpoint B
 //   uv.y: 0 → +side, 1 → −side
 fn quadUv(vid : u32) -> vec2<f32> {
@@ -124,8 +124,6 @@ fn quadUv(vid : u32) -> vec2<f32> {
     case 0u: { return vec2<f32>(0.0, 0.0); }
     case 1u: { return vec2<f32>(1.0, 0.0); }
     case 2u: { return vec2<f32>(0.0, 1.0); }
-    case 3u: { return vec2<f32>(0.0, 1.0); }
-    case 4u: { return vec2<f32>(1.0, 0.0); }
     default: { return vec2<f32>(1.0, 1.0); }
   }
 }
@@ -280,7 +278,7 @@ fn fsMain(in : VSOut) -> @location(0) vec4<f32> {
 
 // ── Dense hairline path (group 3 @ ≥DENSE_HAIRLINE_POINT_THRESHOLD) ─────────
 // WebGPU line-list: 2 vertices per instance, native 1 device-px stroke.
-// Avoids AA-quad expansion (6 verts + SDF fill) that cliffs ~50k under 4× MSAA.
+// Avoids AA-quad expansion (4 verts + SDF fill) that cliffs ~50k under 4× MSAA.
 // Used only when resolveLineDrawPolicy returns denseHairline; does not change data/sampling.
 
 @vertex

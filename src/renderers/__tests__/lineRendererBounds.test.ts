@@ -331,7 +331,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
     expect(hairline!.primitive?.topology).toBe('line-list');
     expect(hairline!.multisample?.count).toBe(1);
     expect(hairline!.multisample?.count).not.toBe(2);
-    expect(standard?.primitive?.topology).toBe('triangle-list');
+    expect(standard?.primitive?.topology).toBe('triangle-strip');
     expect(standard?.multisample?.count).toBe(4);
     renderer.dispose();
   });
@@ -375,7 +375,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
     } as unknown as GPURenderPassEncoder;
     // Must draw AA quads in main pass (not deferred no-op).
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 49_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 49_999 }]);
     renderer.dispose();
   });
 
@@ -524,9 +524,9 @@ describe('createLineRenderer bounds (P2-5)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 9_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 9_999 }]);
     renderer.renderHairline(pass);
-    expect(draws).toEqual([{ v: 6, i: 9_999 }]); // hairline no-op when standard
+    expect(draws).toEqual([{ v: 4, i: 9_999 }]); // hairline no-op when standard
     renderer.dispose();
   });
 
@@ -630,7 +630,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 4_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 4_999 }]);
     renderer.dispose();
   });
 
@@ -673,7 +673,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 4_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 4_999 }]);
     renderer.dispose();
   });
 
@@ -715,7 +715,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 9_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 9_999 }]);
     renderer.dispose();
   });
 
@@ -757,7 +757,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 9_999 }]);
+    expect(draws).toEqual([{ v: 4, i: 9_999 }]);
     renderer.dispose();
   });
 
@@ -801,7 +801,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
     renderer.dispose();
   });
 
-  it('standard render uses AA-quad draw(6, segments) at low N', () => {
+  it('standard render restarts a four-vertex AA quad for every segment', () => {
     const device = createMockDevice();
     const renderer = createLineRenderer(device);
     const data: DataPoint[] = [
@@ -826,7 +826,7 @@ describe('createLineRenderer bounds (P2-5)', () => {
     } as unknown as GPURenderPassEncoder;
 
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: 2 }]);
+    expect(draws).toEqual([{ v: 4, i: 2 }]);
     renderer.dispose();
   });
 
@@ -910,7 +910,7 @@ describe('createLineRenderer dense compact LOD (mountain multi-M)', () => {
       }),
     } as unknown as GPURenderPassEncoder;
     renderer.render(pass);
-    expect(draws).toEqual([{ v: 6, i: n - 1 }]);
+    expect(draws).toEqual([{ v: 4, i: n - 1 }]);
     renderer.dispose();
   });
 
